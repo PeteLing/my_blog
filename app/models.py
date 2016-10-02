@@ -1,8 +1,9 @@
-from . import db,login_manager
+from . import db , login_manager
 from flask_login import UserMixin,AnonymousUserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask import current_app
 from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
+from datetime import datetime
 
 #opertaion_action
 class Permission:
@@ -57,7 +58,14 @@ class User(UserMixin,db.Model):
 	email = db.Column(db.String(64), unique=True, index=True)
 	password_hash = db.Column(db.String(128))
 	
-	confirmed = db.Column(db.Boolean,default=False)
+	#for the test be easier ,default set 'True',but it usually set False
+	confirmed = db.Column(db.Boolean,default=True)
+	
+	name = db.Column(db.String(64))
+	location = db.Column(db.String(64))
+	about_me = db.Column(db.Text())
+	member_since = db.Column(db.DateTime(),default=datetime.utcnow)
+	last_seen = db.Column(db.DateTime(),default=datetime.utcnow)
 	
 	def __init__(self,**kwargs):
 		super(User,self).__init__(**kwargs)
@@ -140,6 +148,10 @@ class User(UserMixin,db.Model):
 	def is_administrator(self):
 		return self.can(Permission.ADMINISTER)
 	
+	def ping(self):
+		self.last_seen = datetime.utcnow()
+		db.session.add(self)
+
 	def __repr__(self):
 		return '<User %r>' % self.username
 		
