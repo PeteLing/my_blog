@@ -43,14 +43,19 @@ class Role(db.Model):
 			role = Role.query.filter_by(name=r).first()
 			if role is None:
 				role = Role(name=r)
-			role.permissions = role[r][0]
-			role.default = role[r][1]
+			role.permissions = roles[r][0]
+			role.default = roles[r][1]
 			db.session.add(role)
 		db.session.commit()
 	
 	def __repr__(self):
 		return '<Role %r>' % self.name
-
+		
+class Follow(db.Model):
+	__tablename__ = 'follows'
+	follower_id = db.Column(db.Integer, db.ForeignKey('users.id'),primary_key=True)
+	followed_id = db.Column(db.Integer, db.ForeignKey('users.id'),primary_key=True)
+	timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
 class User(UserMixin,db.Model):
 	__tablename__ = 'users'
@@ -62,7 +67,7 @@ class User(UserMixin,db.Model):
 	password_hash = db.Column(db.String(128))
 	
 	#for the test be easier ,default set 'True',but it usually set False
-	confirmed = db.Column(db.Boolean,default=True)
+	confirmed = db.Column(db.Boolean,default=False)
 	
 	name = db.Column(db.String(64))
 	location = db.Column(db.String(64))
@@ -73,6 +78,17 @@ class User(UserMixin,db.Model):
 	avatar_hash = db.Column(db.String(32))
 	
 	posts = db.relationship('Post',backref='author',lazy='dynamic')
+	
+	followed = db.relationship('Follow',foreign_keys=[Follow.follower_id],
+								backref=db.backref('follower', lazy='joined'),
+								lazy='dynamic',
+								cascade='all, delete-orphan')
+	followers = db.relationship('Follow',
+						foreign_keys=[Follow.followed_id],
+						backref=db.backref('followed',lazy='joined'),
+						lazy='dynamic',
+						cascade='all,delete-orphan')
+	
 	def __init__(self,**kwargs):
 		super(User,self).__init__(**kwargs)
 		if self.role is None:
@@ -82,6 +98,7 @@ class User(UserMixin,db.Model):
 				self.role = Role.query.filter_by(default=True).first()
 		if self.email is not None and self.avatar_hash is None:
 			self.avatar_hash = hashlib.md5(self.email.encode('utf-8')).hexdigest()
+		self.followed.append(Follow(followed=self))
 	
 	#check the password is right or not
 	@property
@@ -109,7 +126,7 @@ class User(UserMixin,db.Model):
 			return False
 		if data.get('confirm') != self.id:
 			return False
-		self.confirm = True
+		self.confirmed = True
 		db.session.add(self)
 		return True
 		
@@ -192,8 +209,36 @@ class User(UserMixin,db.Model):
 				db.session.commit()
 			except IntegrityError:
 				db.session.rollback()
+	def follow(self,user):
+		if not self.is_following(user):
+			f = Follow(follow=self,followed=user)
+			db.session.add(f)
+			
+	def unfollow(self,user):
+		f = self.followed.filter_by(follow_id=user.id).first()
+		if f:
+			db.session.delete(f)
+		
+	def is_following(self,user):
+		return self.followed.filter_by(
+					followed_id=user.id).first() is not None
+	def is_followed_by(self,user):
+		return self.followers.filter_by(
+					follow_id=user.id).first() is not None
 	def __repr__(self):
 		return '<User %r>' % self.username
+	
+	@staticmethod
+	def add_self_follows():
+		for user in User.query.all():
+			if not user.is_following(user):
+				user.follow(user)
+				db.session.add(user)
+				db.session.commit()
+	@property
+	def followed_posts(self):
+		return Post.query.join(Follow,Follow.followed_id==Post.author_id)\
+				.filter(Follow.follower_id==self.id)
 	
 class AnonymousUser(AnonymousUserMixin):
 	def can(self,permissions):
@@ -235,6 +280,7 @@ class Post(db.Model):
 db.event.listen(Post.body, 'set', Post.on_changed_body)
 login_manager.anonymous_user = AnonymousUser
 
+	
 @login_manager.user_loader
 def load_user(user_id):
 	return User.query.get(int(user_id))
