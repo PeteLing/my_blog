@@ -17,15 +17,14 @@ class Permission:
 	ADMINISTER = 0x80
 
 class Role(db.Model):
+
 	__tablename__ = 'roles'
 	id = db.Column(db.Integer, primary_key=True)
 	name = db.Column(db.String(64), unique=True)
 	users = db.relationship('User', backref='role', lazy='dynamic')
-
 	default = db.Column(db.Boolean,default=False,index=True)
-	#opertaion_number
-	permissions = db.Column(db.Integer)
-	
+	permissions = db.Column(db.Integer)		#opertaion_number
+
 	#create role
 	@staticmethod
 	def insert_roles():
@@ -58,27 +57,22 @@ class Follow(db.Model):
 	timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
 class User(UserMixin,db.Model):
+
 	__tablename__ = 'users'
 	id = db.Column(db.Integer, primary_key=True)
 	username = db.Column(db.String(64), unique=True, index=True)
 	role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
-	
 	email = db.Column(db.String(64), unique=True, index=True)
 	password_hash = db.Column(db.String(128))
-	
-	#for the test be easier ,default set 'True',but it usually set False
-	confirmed = db.Column(db.Boolean,default=False)
-	
+	#For test be easier , default was set True
+	confirmed = db.Column(db.Boolean,default=True)
 	name = db.Column(db.String(64))
 	location = db.Column(db.String(64))
 	about_me = db.Column(db.Text())
 	member_since = db.Column(db.DateTime(),default=datetime.utcnow)
 	last_seen = db.Column(db.DateTime(),default=datetime.utcnow)
-	
 	avatar_hash = db.Column(db.String(32))
-	
 	posts = db.relationship('Post',backref='author',lazy='dynamic')
-	
 	followed = db.relationship('Follow',foreign_keys=[Follow.follower_id],
 								backref=db.backref('follower', lazy='joined'),
 								lazy='dynamic',
@@ -100,21 +94,18 @@ class User(UserMixin,db.Model):
 			self.avatar_hash = hashlib.md5(self.email.encode('utf-8')).hexdigest()
 		self.followed.append(Follow(followed=self))
 	
-	#check the password is right or not
 	@property
-	def password(self):
+	def password(self):						#check the password is right or not
 		raise AttributeError('password is not a readable attribute')
 	
-	#use password to create the password_lists
 	@password.setter
-	def password(self, password):
+	def password(self, password):			#use password to create the password_lists
 		self.password_hash = generate_password_hash(password)
 		
-	#check the password is pair the database_password or not
-	def verify_password(self, password):
+	def verify_password(self, password):	#check the password is pair the database_password or not
 		return check_password_hash(self.password_hash, password)
-	#get the password_list
-	def generate_confirmation_token(self,expiration=3600):
+		
+	def generate_confirmation_token(self,expiration=3600):	#get the password_list
 		s = Serializer(current_app.config['SECRET_KEY'],expiration)
 		return s.dumps({'confirm':self.id})
 	
@@ -133,6 +124,7 @@ class User(UserMixin,db.Model):
 	def generate_reset_token(self,expiration=3600):
 		s = Serializer(current_app.config['SECRET_KEY'],expiration)
 		return s.dumps({'reset':self.id})
+	
 	def reset_password(self,token,new_password):
 		s = Serializer(current_app.config['SECRET_KEY'])
 		try:
@@ -167,11 +159,11 @@ class User(UserMixin,db.Model):
 		self.avatar_hash = hashlib.md5(self.email.encode('utf-8')).hexdigest()
 		db.session.add(self)
 		return True
-	#check the Permission
-	def can(self,permissions):
+
+	def can(self,permissions):				#check the Permission
 		return self.role is not None and \
 			(self.role.permissions & permissions ) == permissions
-		#return True
+			
 	def is_administrator(self):
 		return self.can(Permission.ADMINISTER)
 	
@@ -209,6 +201,7 @@ class User(UserMixin,db.Model):
 				db.session.commit()
 			except IntegrityError:
 				db.session.rollback()
+	
 	def follow(self,user):
 		if not self.is_following(user):
 			f = Follow(follow=self,followed=user)
@@ -222,9 +215,11 @@ class User(UserMixin,db.Model):
 	def is_following(self,user):
 		return self.followed.filter_by(
 					followed_id=user.id).first() is not None
+	
 	def is_followed_by(self,user):
 		return self.followers.filter_by(
 					follow_id=user.id).first() is not None
+	
 	def __repr__(self):
 		return '<User %r>' % self.username
 	
@@ -235,6 +230,7 @@ class User(UserMixin,db.Model):
 				user.follow(user)
 				db.session.add(user)
 				db.session.commit()
+	
 	@property
 	def followed_posts(self):
 		return Post.query.join(Follow,Follow.followed_id==Post.author_id)\

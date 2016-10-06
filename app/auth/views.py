@@ -8,7 +8,6 @@ from .forms import LoginForm,RegistrationForm,ChangePasswordForm,\
 		PasswordResetRequestForm,PasswordResetForm,ChangeEmailForm
 
 
-#gouzi
 @auth.before_app_request
 def before_request():
 	if current_user.is_authenticated:
@@ -24,8 +23,7 @@ def unconfirmed():
 		return redirect(url_for('main.index'))
 	return render_template('auth/unconfirmed.html')
 	
-#if success login ,render to login.html 
-#else render main.index
+
 @auth.route('/login', methods=['GET', 'POST'])
 def login():
 	form = LoginForm()
@@ -45,7 +43,7 @@ def logout():
 	flash('You have been logged out.')
 	return redirect(url_for('main.index'))
 	
-#user_regist
+
 @auth.route('/register', methods=['GET', 'POST'])
 def register():
 	form = RegistrationForm()

@@ -10,8 +10,10 @@ from ..decorators import admin_required,permission_required
 @main.route('/',methods=['GET','POST'])
 def index():
 	form = PostForm()
+	'''
 	if current_user.can(Permission.WRITE_ARTICLES) \
-			and form.validate_on_submit():
+			and form.validate_on_submit():'''
+	if form.validate_on_submit():
 		post = Post(body=form.body.data,
 				author = current_user._get_current_object())
 		db.session.add(post)
@@ -103,7 +105,7 @@ def edit(id):
 		post.body = form.body.data
 		db.session.add(post)
 		flash('The post has been update')
-		return redirect(url_for('post', id=post.id))
+		return redirect(url_for('.post', id=post.id))
 	form.body.data = post.body
 	return render_template('edit_post.html', form=form)
 	
